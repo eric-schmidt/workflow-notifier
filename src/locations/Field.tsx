@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Autocomplete, Box, Flex, Pill } from '@contentful/f36-components';
 import { FieldAppSDK } from '@contentful/app-sdk';
 import { useAutoResizer, useSDK } from '@contentful/react-apps-toolkit';
 import tokens from '@contentful/f36-tokens';
 import { css } from 'emotion';
 
-// Height the iframe is forced to while the dropdown is open: input row (~40px) +
-// dropdown list max-height (180px, Autocomplete's default) + breathing room.
-const DROPDOWN_EXPANDED_HEIGHT = 240;
+// Visual gap left below the open dropdown so the iframe doesn't snap flush against
+// the popover's bottom edge.
+const DROPDOWN_BOTTOM_BUFFER = 16;
 
 const autocompleteStyles = css({
   '[data-test-id="cf-autocomplete-container"]': {
@@ -37,23 +37,51 @@ const Field = () => {
   // Resize the iframe to fit body content (including absolute-positioned elements
   // like the dropdown popover) while the dropdown is closed. We pause this and
   // take over manually while it's open — see handleDropdownOpen/Close below.
-  // Pattern lifted from contentful/apps:apps/marketo/src/locations/Field.tsx.
+  // Pattern derived from contentful/apps:apps/marketo/src/locations/Field.tsx,
+  // but with dynamic height tracking instead of Marketo's fixed expanded height
+  // (which would leave an awkward gap whenever the filtered list is short).
   useAutoResizer({ absoluteElements: true });
 
   // When the dropdown opens, useAutoResizer would size the iframe flush against
   // the popover's bottom edge — there's no buffer/offset option on the hook, and
   // the popover's container has no externally-targetable element where margin
   // would add visual space without also growing the dropdown. So we stop the
-  // auto-resizer and pin the iframe to a fixed expanded height that leaves room
-  // below the dropdown. On close we restart auto-resize and the iframe shrinks
-  // back to fit the input + any selected pills.
+  // auto-resizer and run a ResizeObserver on the popover for as long as it's
+  // open, sizing the iframe to popover.bottom + a buffer. On close we restart
+  // the auto-resizer and the iframe shrinks back to fit input + pills.
+  const openResizerCleanup = useRef<(() => void) | null>(null);
+
   const handleDropdownOpen = () => {
     sdk.window.stopAutoResizer();
-    sdk.window.updateHeight(DROPDOWN_EXPANDED_HEIGHT);
+
+    const sync = () => {
+      const popover = document.querySelector<HTMLElement>(
+        '[data-test-id="cf-autocomplete-container"]'
+      );
+      const docHeight = Math.ceil(
+        document.documentElement.getBoundingClientRect().height
+      );
+      const popoverBottom = popover
+        ? Math.ceil(popover.getBoundingClientRect().bottom)
+        : 0;
+      sdk.window.updateHeight(
+        Math.max(docHeight, popoverBottom) + DROPDOWN_BOTTOM_BUFFER
+      );
+    };
+
+    sync();
+    const ro = new ResizeObserver(sync);
+    ro.observe(document.body);
+    openResizerCleanup.current = () => ro.disconnect();
   };
+
   const handleDropdownClose = () => {
+    openResizerCleanup.current?.();
+    openResizerCleanup.current = null;
     sdk.window.startAutoResizer({ absoluteElements: true });
   };
+
+  useEffect(() => () => openResizerCleanup.current?.(), []);
 
   const [stakeholders, setStakeholders] = useState<Stakeholder[]>(
     sdk.field.getValue() ?? []

@@ -11,4 +11,12 @@ configure({
   testIdAttribute: 'data-test-id',
 });
 
+if (!globalThis.ResizeObserver) {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
+
 expect.extend(matchers);
