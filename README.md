@@ -147,6 +147,7 @@ contentful-app-manifest.json      # Declares the notifications function
 
 ## Out of scope (today)
 
-- Localized stakeholders / brand fields — the function reads whichever locale the field happens to define.
+- Proceeding to an "Approved" step once all assigned Tasks are completed.
 - Auto-resolving tasks when the workflow leaves the trigger step.
 - Backfill for entries already past the trigger step at install time.
+- Localized stakeholders / brand fields — the function reads whichever locale the field happens to define.
