@@ -1,3 +1,9 @@
+// Purpose: App config UI. Fetches all WorkflowDefinitions in the current env,
+// flattens to (workflow → step) rows, and lets the installer pick which pairs
+// trigger the notifications function. Persists as triggers[] on the app
+// installation parameters. Does NOT use useDropdownAwareAutoResizer (would
+// throw in app-config location).
+
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ConfigAppSDK } from '@contentful/app-sdk';
 import {

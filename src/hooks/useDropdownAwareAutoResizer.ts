@@ -1,3 +1,9 @@
+// Purpose: Dynamic iframe sizing for an Autocomplete dropdown. Swaps the
+// default auto-resizer for a ResizeObserver while the popover is open so the
+// iframe tracks the popover's actual bottom edge + buffer (avoids both
+// clipping and the empty-gap of a fixed expanded height). Field/Sidebar/Dialog
+// only; calling from app-config/page locations throws.
+
 import { useEffect, useRef } from 'react';
 import { FieldAppSDK, SidebarAppSDK, DialogAppSDK } from '@contentful/app-sdk';
 import { useAutoResizer, useSDK } from '@contentful/react-apps-toolkit';

@@ -1,3 +1,8 @@
+// Purpose: Generic Autocomplete + removable Pill list, location-agnostic.
+// Caller owns selection state and may pass onOpen/onClose (used by Field via
+// useDropdownAwareAutoResizer; omitted in ConfigScreen where the resizer
+// would throw). Defeats Downshift's selectedItem cache with a sentinel.
+
 import { useMemo, useState } from 'react';
 import { Autocomplete, Flex, Pill } from '@contentful/f36-components';
 import tokens from '@contentful/f36-tokens';

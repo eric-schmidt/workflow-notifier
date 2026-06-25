@@ -1,3 +1,8 @@
+// Purpose: App Event handler for Workflow.save. Reads installation triggers,
+// walks the entry's brands[] links, dedupes stakeholders by userId, and fans
+// out a Task per stakeholder. Body shape per WorkflowProps (entry/definition
+// links live under sys, stepId at top level).
+
 import type {
   AppEventRequest,
   FunctionEventContext,

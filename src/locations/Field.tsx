@@ -1,3 +1,8 @@
+// Purpose: Stakeholders field editor. Fetches all users in the space and lets
+// editors pick them via PillSelector. Persists Array<{ userId, firstName,
+// lastName }> on the field. Uses useDropdownAwareAutoResizer so the iframe
+// tracks the open dropdown's height.
+
 import { useEffect, useMemo, useState } from 'react';
 import { Box } from '@contentful/f36-components';
 import { FieldAppSDK } from '@contentful/app-sdk';
