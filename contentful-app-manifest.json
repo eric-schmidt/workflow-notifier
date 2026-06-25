@@ -1,0 +1,13 @@
+{
+  "functions": [
+    {
+      "id": "notifications",
+      "name": "Workflow notifications",
+      "description": "Creates Contentful Tasks for stakeholders when a configured workflow step is reached.",
+      "path": "functions/notifications.js",
+      "entryFile": "functions/notifications.ts",
+      "allowNetworks": [],
+      "accepts": ["appevent.handler"]
+    }
+  ]
+}

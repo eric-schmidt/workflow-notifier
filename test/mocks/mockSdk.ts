@@ -10,6 +10,8 @@ const mockSdk: any = {
   ids: {
     app: 'test-app',
     space: 'test-space',
+    environment: 'test-env',
+    environmentAlias: undefined,
   },
   field: {
     getValue: vi.fn().mockReturnValue([]),

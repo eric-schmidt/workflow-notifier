@@ -1,79 +1,152 @@
-This project was bootstrapped with [Create Contentful App](https://github.com/contentful/create-contentful-app).
+# Workflow Notifier
 
-## How to use
+A Contentful App that ties two missing pieces together:
 
-Execute create-contentful-app with npm, npx or yarn to bootstrap the example:
+1. A **Stakeholders field editor** for picking users from a Space and storing them on an entry as JSON.
+2. An **App Event handler** that watches Workflow step changes and, on the configured trigger steps, creates a Contentful Task for each stakeholder on the entry's linked brand(s).
 
-```bash
-# npx
-npx create-contentful-app --typescript
+The intended flow:
 
-# npm
-npm init contentful-app -- --typescript
+> An entry referencing one or more brands moves through a Workflow. When it
+> reaches a configured step (e.g. "Ready for review"), every user listed as a
+> stakeholder on those brands automatically gets a Task on the entry asking
+> them to review it.
 
-# Yarn
-yarn create contentful-app --typescript
+## How it fits together
+
+```
+┌──────────────────────────────┐      ┌─────────────────────────────┐
+│ Brand entry                  │      │ PDP entry (or similar)      │
+│                              │      │                             │
+│  stakeholders: JSON ◄────────┼──────┤  brands: Array<Link>        │
+│   (user picker, this app)    │      │                             │
+└──────────────────────────────┘      │  workflow ──┐               │
+                                      └─────────────┼───────────────┘
+                                                    │
+                                       Workflow.save│event
+                                                    ▼
+                              ┌─────────────────────────────────────┐
+                              │ functions/notifications.ts          │
+                              │                                     │
+                              │ if step matches a configured        │
+                              │ trigger → walk brands → dedupe      │
+                              │ stakeholders → create one Task each │
+                              └─────────────────────────────────────┘
 ```
 
-## Available Scripts
+The **Field app** (`src/locations/Field.tsx`) populates the JSON. The **App Event Handler function** (`functions/notifications.ts`) consumes it. The **ConfigScreen** (`src/locations/ConfigScreen.tsx`) is where you pick which workflow + step pairs should fire the handler.
 
-In the project directory, you can run:
+## Stakeholders Field
 
-#### `npm start`
+`src/locations/Field.tsx` renders on any JSON field a brand uses to store stakeholders. It:
 
-Creates or updates your app definition in Contentful, and runs the app in development mode.
-Open your app to view it in the browser.
+- Fetches every user in the current Space via `sdk.cma.user.getManyForSpace`.
+- Lets editors search and pick users via a Forma 36 `Autocomplete`.
+- Renders each selection as a removable `Pill`.
+- Persists the selection as `Array<{ userId, firstName, lastName }>` on the JSON field.
 
-The page will reload if you make edits.
-You will also see any lint errors in the console.
+Picker UX lives in a shared component, `src/components/PillSelector.tsx`, so the same widget powers both this field and the ConfigScreen's trigger picker.
 
-#### `npm run build`
+Field configuration recommendation in Contentful:
+- Field type: **JSON object**
+- Field id: `stakeholders` (or any name — the function reads the field by id from the brand entry, currently `stakeholders`).
 
-Builds the app for production to the `build` folder.
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Workflow Notifier ConfigScreen
 
-The build is minified and the filenames include the hashes.
-Your app is ready to be deployed!
+`src/locations/ConfigScreen.tsx` lists every Workflow Definition in the current environment (`sdk.cma.workflowDefinition.getMany`), flattens them to one row per `(workflow → step)`, and lets the installer pick which steps should trigger the notifier. Selections persist as installation parameters:
 
-#### `npm run upload`
-
-Uploads the build folder to contentful and creates a bundle that is automatically activated.
-The command guides you through the deployment process and asks for all required arguments.
-Read [here](https://www.contentful.com/developers/docs/extensibility/app-framework/create-contentful-app/#deploy-with-contentful) for more information about the deployment process.
-
-#### `npm run upload-ci`
-
-Similar to `npm run upload` it will upload your app to contentful and activate it. The only difference is  
-that with this command all required arguments are read from the environment variables, for example when you add
-the upload command to your CI pipeline.
-
-For this command to work, the following environment variables must be set:
-
-- `CONTENTFUL_ORG_ID` - The ID of your organization
-- `CONTENTFUL_APP_DEF_ID` - The ID of the app to which to add the bundle
-- `CONTENTFUL_ACCESS_TOKEN` - A personal [access token](https://www.contentful.com/developers/docs/references/content-management-api/#/reference/personal-access-tokens)
-
-## Libraries to use
-
-To make your app look and feel like Contentful use the following libraries:
-
-- [Forma 36](https://f36.contentful.com/) – Contentful's design system
-- [Contentful Field Editors](https://www.contentful.com/developers/docs/extensibility/field-editors/) – Contentful's field editor React components
-
-## Using the `contentful-management` SDK
-
-In the default create contentful app output, a contentful management client is
-passed into each location. This can be used to interact with Contentful's
-management API. For example
-
-```js
-// Use the client
-cma.locale.getMany({}).then((locales) => console.log(locales));
+```ts
+type WorkflowStepTrigger = {
+  workflowDefinitionId: string;
+  workflowDefinitionName: string;
+  stepId: string;
+  stepName: string;
+};
+type AppInstallationParameters = { triggers: WorkflowStepTrigger[] };
 ```
 
-Visit the [`contentful-management` documentation](https://www.contentful.com/developers/docs/extensibility/app-framework/sdk/#using-the-contentful-management-library)
-to find out more.
+## Notifications App Event Function
 
-## Learn More
+`functions/notifications.ts` is registered in `contentful-app-manifest.json` as an `appevent.handler`. It expects to be wired to the **`Workflow.save`** topic on the app's event subscription.
 
-[Read more](https://www.contentful.com/developers/docs/extensibility/app-framework/create-contentful-app/) and check out the video on how to use the CLI.
+On each event it:
+
+1. Reads `stepId` from the event body and `workflowDefinitionId` / `entryId` from the body's `sys.workflowDefinition` and `sys.entity` links. (The `Workflow.save` payload is the Workflow entity itself — `WorkflowProps` from `contentful-management`, not the legacy changelog shape.)
+2. Bails if `(workflowDefinitionId, stepId)` isn't in the installation's `triggers`.
+3. Fetches the triggering entry, reads its `brands` array field.
+4. Fetches each linked brand entry and unions all `stakeholders[].userId` values across them — one task per unique user.
+5. Creates a Contentful Task on the triggering entry per stakeholder, with body `"<adminTitle> is ready for your review."` and `assignedTo: Link<User>`.
+
+### Hardcoded field IDs
+
+The function reads three fields by id. Change these constants at the top of `functions/notifications.ts` if your content model uses different names:
+
+| Constant | Default | Lives on |
+| --- | --- | --- |
+| `BRAND_FIELD_ID` | `'brands'` | The entry that fires the workflow |
+| `STAKEHOLDERS_FIELD_ID` | `'stakeholders'` | The linked brand entries |
+| `ADMIN_TITLE_FIELD_ID` | `'adminTitle'` | The triggering entry (used in the task body) |
+
+### Wiring the subscription (one-time, per app definition)
+
+After deploying:
+
+1. In the Contentful web app, open the App Definition for this app.
+2. **Events** tab → enable events.
+3. Subscribe to topic `Workflow.save`.
+4. Link the `notifications` function to the subscription.
+
+### Debugging
+
+CMA errors inside Contentful Functions surface as opaque `{ remote: true }` rejections — the underlying message is lost across the function boundary. The handler logs every early-return and every failed `task.create`; if a fan-out fails, log the inputs and reproduce the same CMA call against the plain client to see the real error.
+
+## Project layout
+
+```
+src/
+├── components/
+│   └── PillSelector.tsx          # Shared Autocomplete + Pill list
+├── hooks/
+│   └── useDropdownAwareAutoResizer.ts  # Field/Sidebar/Dialog iframe sizing
+├── locations/
+│   ├── ConfigScreen.tsx          # Workflow + step picker
+│   ├── Field.tsx                 # Stakeholders picker
+│   ├── Dialog.tsx, EntryEditor.tsx, Home.tsx, Page.tsx, Sidebar.tsx (unused stubs)
+│   └── *.spec.tsx
+├── App.tsx
+└── index.tsx
+
+functions/
+├── notifications.ts              # App Event Handler
+└── notifications.spec.ts
+
+contentful-app-manifest.json      # Declares the notifications function
+```
+
+## Scripts
+
+| Command | What it does |
+| --- | --- |
+| `npm start` | Vite dev server for the frontend locations |
+| `npm run build` | Builds the frontend AND bundles `functions/` via `contentful-app-scripts build-functions` |
+| `npm run build:functions` | Just the function bundle |
+| `npm run upload` | Interactive upload of `build/` (frontend + functions + manifest) |
+| `npm run upload-ci` | Same, but reads `CONTENTFUL_ORG_ID`, `CONTENTFUL_APP_DEF_ID`, `CONTENTFUL_ACCESS_TOKEN` from env |
+| `npm test` / `npm run test:ci` | Vitest |
+| `npm run create-app-definition` | Interactive scaffold of a new app definition in Contentful |
+| `npm run add-locations` | Adds locations to an existing app definition |
+
+## Stack
+
+- [Forma 36](https://f36.contentful.com/) — design system
+- [`@contentful/app-sdk`](https://www.contentful.com/developers/docs/extensibility/app-framework/sdk/) — runtime SDK for the locations
+- [`@contentful/react-apps-toolkit`](https://www.contentful.com/developers/docs/extensibility/app-framework/react-apps-toolkit/) — `useSDK`, `useAutoResizer`, auto-authed CMA client
+- [`@contentful/node-apps-toolkit`](https://github.com/contentful/node-apps-toolkit) — types and runtime for App Event functions
+- [`contentful-management`](https://github.com/contentful/contentful-management.js) — CMA client used by both the ConfigScreen and the function
+- Vite + Vitest
+
+## Out of scope (today)
+
+- Localized stakeholders / brand fields — the function reads whichever locale the field happens to define.
+- Auto-resolving tasks when the workflow leaves the trigger step.
+- Backfill for entries already past the trigger step at install time.
