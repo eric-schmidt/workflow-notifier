@@ -1,0 +1,45 @@
+{
+    "name": "Translation",
+    "description": "Use this Workflow to track the progress of translated content ahead of publication.",
+    "startOnEntityCreation": true,
+    "flowType": "strict_neighbor",
+    "steps": [
+        {
+            "name": "Translation Not Started",
+            "description": "",
+            "annotations": [
+                "cf-color-0"
+            ],
+            "actions": [],
+            "permissions": []
+        },
+        {
+            "name": "Translation Pending",
+            "description": "",
+            "annotations": [
+                "cf-color-1"
+            ],
+            "actions": [],
+            "permissions": []
+        },
+        {
+            "name": "Translation Ready For Review",
+            "description": "",
+            "annotations": [
+                "cf-color-2"
+            ],
+            "actions": [],
+            "permissions": []
+        },
+        {
+            "name": "Translation Approved",
+            "description": "",
+            "annotations": [
+                "cf-color-3"
+            ],
+            "actions": [],
+            "permissions": []
+        }
+    ],
+    "appliesTo": []
+}

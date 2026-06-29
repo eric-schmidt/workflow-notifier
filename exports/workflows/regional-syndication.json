@@ -1,0 +1,27 @@
+{
+    "name": "Regional Syndication",
+    "description": "Use this Workflow to track whether or not content is ready to be syndicated to other Spaces.",
+    "startOnEntityCreation": true,
+    "flowType": "strict_neighbor",
+    "steps": [
+        {
+            "name": "Not Ready For Regionalization",
+            "description": "This content is not yet ready for regional syndication.",
+            "annotations": [
+                "cf-color-0"
+            ],
+            "actions": [],
+            "permissions": []
+        },
+        {
+            "name": "Ready For Regionalization",
+            "description": "",
+            "annotations": [
+                "cf-color-3"
+            ],
+            "actions": [],
+            "permissions": []
+        }
+    ],
+    "appliesTo": []
+}

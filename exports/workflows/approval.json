@@ -1,0 +1,45 @@
+{
+    "name": "Approval",
+    "description": "Use this Workflow to track the full content approval process, including reviews and final publication.",
+    "startOnEntityCreation": true,
+    "flowType": "strict_neighbor",
+    "steps": [
+        {
+            "name": "In Progress",
+            "description": "",
+            "annotations": [
+                "cf-color-0"
+            ],
+            "actions": [],
+            "permissions": []
+        },
+        {
+            "name": "Ready For Review",
+            "description": "",
+            "annotations": [
+                "cf-color-1"
+            ],
+            "actions": [],
+            "permissions": []
+        },
+        {
+            "name": "Approved",
+            "description": "",
+            "annotations": [
+                "cf-color-3"
+            ],
+            "actions": [],
+            "permissions": []
+        },
+        {
+            "name": "Scheduled For Publication",
+            "description": "",
+            "annotations": [
+                "cf-color-4"
+            ],
+            "actions": [],
+            "permissions": []
+        }
+    ],
+    "appliesTo": []
+}
