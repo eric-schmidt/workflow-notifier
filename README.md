@@ -25,6 +25,11 @@
 2. Navigate to your content model and edit your chosen "Stakeholders" JSON field, applying your App Definition (see above) to the field's appearance.
   - Note: This repo contains an example content model (`space-export.json`) that you can import into a blank Space to get a head start.
 
+### Importing the Space Export
+1. Make sure the target space is blank — `contentful-import` is idempotent by entity `sys.id`, so re-running against a populated space will *update* matching entities in place rather than fail.
+2. Run `npm run import-content-model` and follow the prompts (space ID, environment ID, and a y/N confirm). Pass `--yes` to skip the confirm in scripted environments.
+3. The script imports everything in `exports/space/space-export.json` — content types, editor interfaces, locales, tags, entries, and assets (with binaries). CMA errors are surfaced verbatim, including a `details:` block with the underlying response.
+
 ### Importing Workflows
 1. Run `npm run import-workflows` to automatically import the workflows defined in `@/exports/workflows`.
 2. Assign any relevant content types to the imported Workflows as needed (see [these docs](https://www.contentful.com/help/ai-automations/workflows/creating-a-workflow/)), nothing the field requirements (e.g. `stakeholders`) noted below.
@@ -167,6 +172,7 @@ contentful-app-manifest.json      # Declares the notifications function
 | `npm run create-app-definition` | Interactive scaffold of a new app definition in Contentful |
 | `npm run add-locations` | Adds locations to an existing app definition |
 | `npm run import-workflows` | Creates a Workflow Definition in the target space/env from each JSON in `exports/workflows/`. Prompts interactively for the space ID and environment ID; reads `CONTENTFUL_ACCESS_TOKEN` from `.env`. Create-only — re-running may produce duplicates or 4xx; failures are logged per file. |
+| `npm run import-content-model` | Imports the full space export at `exports/space/space-export.json` (content types, editor interfaces, locales, tags, entries, assets) into the target space/env via `contentful-import`. Prompts for space ID, environment ID, and a y/N confirm (`--yes` skips); reads `CONTENTFUL_ACCESS_TOKEN` from `.env`. Idempotent by `sys.id` — existing entities are updated, not failed. CMA errors surface with a `details:` block. |
 
 ## Stack
 
