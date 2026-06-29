@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { createRequire } from 'node:module';
@@ -38,19 +38,46 @@ if (!input.isTTY) {
   process.exit(1);
 }
 
-const contentFile = join(process.cwd(), 'exports/space/space-export.json');
-if (!existsSync(contentFile)) {
-  err(c.red(`Could not find space export at ${contentFile}.`));
+const dir = join(process.cwd(), 'exports/space');
+
+let candidates: string[];
+try {
+  candidates = readdirSync(dir).filter((f) => f.endsWith('.json'));
+} catch (e) {
+  err(c.red(`Could not read directory ${dir}: ${(e as Error).message}`));
+  process.exit(1);
+}
+
+if (candidates.length === 0) {
+  err(c.red(`No .json files found in ${dir}. Nothing to import.`));
   process.exit(1);
 }
 
 const skipConfirm = process.argv.includes('--yes') || process.argv.includes('-y');
 
 const rl = createInterface({ input, output });
+let chosenFile: string;
 let spaceId: string;
 let environmentId: string;
 let confirmed = skipConfirm;
 try {
+  if (candidates.length === 1) {
+    chosenFile = candidates[0];
+    log(`Found one export: ${c.bold(chosenFile)}`);
+  } else {
+    log(`Found ${c.bold(String(candidates.length))} exports in ${c.bold('exports/space')}:`);
+    candidates.forEach((f, i) => log(`  ${c.bold(`[${i + 1}]`)} ${f}`));
+    const answer = (
+      await rl.question(`${tag} ${c.bold('Select an export')} ${c.gray(`(1-${candidates.length})`)}: `)
+    ).trim();
+    const idx = Number(answer) - 1;
+    if (!Number.isInteger(idx) || idx < 0 || idx >= candidates.length) {
+      err(c.red(`Invalid selection: ${answer}`));
+      process.exit(1);
+    }
+    chosenFile = candidates[idx];
+  }
+
   spaceId = (await rl.question(`${tag} ${c.bold('Space ID')}: `)).trim();
   if (!spaceId) {
     err(c.red('Space ID is required.'));
@@ -66,7 +93,7 @@ try {
   if (!confirmed) {
     const answer = (
       await rl.question(
-        `${tag} ${c.yellow('Proceed with full import into')} space=${c.bold(spaceId)} env=${c.bold(environmentId)}${c.yellow('?')} ${c.gray('(y/N)')}: `,
+        `${tag} ${c.yellow('Proceed with full import of')} ${c.bold(chosenFile)} ${c.yellow('into')} space=${c.bold(spaceId)} env=${c.bold(environmentId)}${c.yellow('?')} ${c.gray('(y/N)')}: `,
       )
     )
       .trim()
@@ -77,13 +104,15 @@ try {
   rl.close();
 }
 
+const contentFile = join(dir, chosenFile);
+
 if (!confirmed) {
   log(c.yellow('Aborted.'));
   process.exit(0);
 }
 
 log(
-  `Importing ${c.bold('exports/space/space-export.json')} into space=${c.bold(spaceId)} env=${c.bold(environmentId)}`,
+  `Importing ${c.bold(`exports/space/${chosenFile}`)} into space=${c.bold(spaceId)} env=${c.bold(environmentId)}`,
 );
 
 try {
