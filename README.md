@@ -113,15 +113,15 @@ On each event it:
 4. Fetches each linked brand entry and unions all `stakeholders[].userId` values across them — one task per unique user.
 5. Creates a Contentful Task on the triggering entry per stakeholder, with body `"<adminTitle> is ready for your review."` and `assignedTo: Link<User>`.
 
-### Hardcoded field IDs
+### Configurable field IDs
 
-The function reads three fields by id. Change these constants at the top of `functions/notifications.ts` if your content model uses different names:
+The function reads three field IDs from installation parameters — curate them on the ConfigScreen, not in code. All three are required; the function aborts if any are missing.
 
-| Constant | Default | Lives on |
+| Parameter | Lives on | Purpose |
 | --- | --- | --- |
-| `BRAND_FIELD_ID` | `'brands'` | The entry that fires the workflow |
-| `STAKEHOLDERS_FIELD_ID` | `'stakeholders'` | The linked brand entries |
-| `ADMIN_TITLE_FIELD_ID` | `'adminTitle'` | The triggering entry (used in the task body) |
+| `pageTitleFieldId` | The entry that fires the workflow | Used in the task body |
+| `pageStakeholderFieldId` | The entry that fires the workflow | Reference field whose linked entries hold the stakeholder lists |
+| `stakeholderMemberFieldId` | Each linked stakeholder entry | JSON field listing individual users |
 
 ### Wiring the subscription (one-time, per app definition)
 

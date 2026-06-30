@@ -15,7 +15,7 @@ describe('ConfigScreen', () => {
     render(<ConfigScreen />);
 
     expect(
-      screen.getByText('Workflow notifier configuration')
+      screen.getByText('Workflow Notifier Configuration')
     ).toBeInTheDocument();
 
     await waitFor(() => {
@@ -25,6 +25,31 @@ describe('ConfigScreen', () => {
         query: { limit: 100 },
       });
     });
+  });
+
+  it('renders all three field-id inputs with help text', async () => {
+    mockCma.workflowDefinition.getMany.mockResolvedValueOnce({ items: [] });
+
+    render(<ConfigScreen />);
+
+    expect(screen.getByLabelText(/Title Field ID/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Stakeholder Field ID/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Members Field ID/i)).toBeInTheDocument();
+  });
+
+  it('blocks save when any required field id is empty', async () => {
+    mockCma.workflowDefinition.getMany.mockResolvedValueOnce({ items: [] });
+
+    render(<ConfigScreen />);
+
+    expect(
+      screen.getByText(/All fields below are required/i)
+    ).toBeInTheDocument();
+
+    // The onConfigure callback Contentful invokes on save.
+    const onConfigureFn = mockSdk.app.onConfigure.mock.calls[0]?.[0];
+    expect(onConfigureFn).toBeTypeOf('function');
+    await expect(onConfigureFn()).resolves.toBe(false);
   });
 
   it('shows an empty-state Note when no workflow definitions exist', async () => {

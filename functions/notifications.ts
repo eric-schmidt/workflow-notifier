@@ -1,7 +1,10 @@
-// Purpose: App Event handler for Workflow.save. Reads installation triggers,
-// walks the entry's brands[] links, dedupes stakeholders by userId, and fans
-// out a Task per stakeholder. Body shape per WorkflowProps (entry/definition
-// links live under sys, stepId at top level).
+// Purpose: App Event handler for Workflow.save. Reads installation triggers
+// and field-id parameters, walks the configured stakeholder-reference field on
+// the triggering entry, dedupes stakeholder members by userId across the linked
+// entries, and fans out a Task per stakeholder. Body shape per WorkflowProps
+// (entry/definition links live under sys, stepId at top level). Field IDs are
+// curated on the ConfigScreen and persisted as installation parameters; the
+// handler aborts if any are missing.
 
 import type {
   AppEventRequest,
@@ -10,11 +13,8 @@ import type {
   FunctionTypeEnum,
 } from '@contentful/node-apps-toolkit';
 
-const TASK_BODY = (adminTitle: string) =>
-  `${adminTitle} is ready for your review.`;
-const BRAND_FIELD_ID = 'brands';
-const STAKEHOLDERS_FIELD_ID = 'stakeholders';
-const ADMIN_TITLE_FIELD_ID = 'adminTitle';
+const TASK_BODY = (pageTitle: string) =>
+  `${pageTitle} is ready for your review.`;
 
 export type Trigger = {
   workflowDefinitionId: string;
@@ -23,6 +23,9 @@ export type Trigger = {
 
 export type AppParameters = {
   triggers?: Trigger[];
+  pageStakeholderFieldId?: string;
+  stakeholderMemberFieldId?: string;
+  pageTitleFieldId?: string;
 };
 
 export type Stakeholder = {
@@ -52,6 +55,25 @@ export const handler: EventHandler<FunctionTypeEnum.AppEventHandler> = async (
   const triggers = params?.triggers ?? [];
   if (!triggers.length) {
     console.info('notifications: no triggers configured; nothing to do.');
+    return;
+  }
+
+  const pageStakeholderFieldId = params?.pageStakeholderFieldId?.trim();
+  const stakeholderMemberFieldId = params?.stakeholderMemberFieldId?.trim();
+  const pageTitleFieldId = params?.pageTitleFieldId?.trim();
+  if (
+    !pageStakeholderFieldId ||
+    !stakeholderMemberFieldId ||
+    !pageTitleFieldId
+  ) {
+    console.warn(
+      'notifications: installation parameters are missing one or more required field ids; aborting.',
+      JSON.stringify({
+        pageStakeholderFieldId,
+        stakeholderMemberFieldId,
+        pageTitleFieldId,
+      })
+    );
     return;
   }
 
@@ -93,54 +115,55 @@ export const handler: EventHandler<FunctionTypeEnum.AppEventHandler> = async (
   const entry = await cma.entry.get({ spaceId, environmentId, entryId });
 
   // We treat this app as single-locale: read whichever locale the field defines.
-  // Multi-locale brand stakeholders would need an explicit locale strategy.
-  const titleLocale = firstLocale(entry.fields[ADMIN_TITLE_FIELD_ID] as any);
-  const adminTitle: string =
+  // Multi-locale stakeholder content would need an explicit locale strategy.
+  const titleLocale = firstLocale(entry.fields[pageTitleFieldId] as any);
+  const pageTitle: string =
     (titleLocale &&
-      (entry.fields[ADMIN_TITLE_FIELD_ID] as Record<string, string>)[
+      (entry.fields[pageTitleFieldId] as Record<string, string>)[
         titleLocale
       ]) ||
     '(untitled)';
 
-  const brandLocale = firstLocale(entry.fields[BRAND_FIELD_ID] as any);
-  const brandLinks: Array<{ sys: { id: string } }> =
-    (brandLocale &&
-      (entry.fields[BRAND_FIELD_ID] as Record<
+  const refLocale = firstLocale(entry.fields[pageStakeholderFieldId] as any);
+  const stakeholderRefLinks: Array<{ sys: { id: string } }> =
+    (refLocale &&
+      (entry.fields[pageStakeholderFieldId] as Record<
         string,
         Array<{ sys: { id: string } }>
-      >)[brandLocale]) ||
+      >)[refLocale]) ||
     [];
-  if (!brandLinks.length) {
+  if (!stakeholderRefLinks.length) {
     console.warn(
-      `notifications: entry ${entryId} has no linked brands; nothing to assign.`
+      `notifications: entry ${entryId} has no linked stakeholder entries on field "${pageStakeholderFieldId}"; nothing to assign.`
     );
     return;
   }
 
-  const brands = await Promise.all(
-    brandLinks.map((l) =>
+  const stakeholderEntries = await Promise.all(
+    stakeholderRefLinks.map((l) =>
       cma.entry.get({ spaceId, environmentId, entryId: l.sys.id })
     )
   );
 
   const uniqueUsers = new Map<string, Stakeholder>();
-  for (const brand of brands) {
-    const stakeholdersLocale = firstLocale(
-      brand.fields[STAKEHOLDERS_FIELD_ID] as any
+  for (const ref of stakeholderEntries) {
+    const memberLocale = firstLocale(
+      ref.fields[stakeholderMemberFieldId] as any
     );
-    const stakeholders: Stakeholder[] =
-      (stakeholdersLocale &&
-        (brand.fields[STAKEHOLDERS_FIELD_ID] as Record<string, Stakeholder[]>)[
-          stakeholdersLocale
-        ]) ||
+    const members: Stakeholder[] =
+      (memberLocale &&
+        (ref.fields[stakeholderMemberFieldId] as Record<
+          string,
+          Stakeholder[]
+        >)[memberLocale]) ||
       [];
-    for (const s of stakeholders) {
+    for (const s of members) {
       if (s?.userId) uniqueUsers.set(s.userId, s);
     }
   }
   if (!uniqueUsers.size) {
     console.warn(
-      `notifications: linked brands had no stakeholders for entry ${entryId}.`
+      `notifications: linked stakeholder entries had no members for entry ${entryId}.`
     );
     return;
   }
@@ -154,7 +177,7 @@ export const handler: EventHandler<FunctionTypeEnum.AppEventHandler> = async (
       cma.task.create(
         { spaceId, environmentId, entryId },
         {
-          body: TASK_BODY(adminTitle),
+          body: TASK_BODY(pageTitle),
           status: 'active',
           assignedTo: {
             sys: { type: 'Link', linkType: 'User', id: userId },

@@ -24,12 +24,29 @@ const makeCma = (overrides: Record<string, any> = {}) => ({
   task: { create: vi.fn().mockResolvedValue({}), ...overrides.task },
 });
 
-const baseContext = (cma: any, triggers: Array<{ workflowDefinitionId: string; stepId: string }>) =>
+// Field IDs live in installation parameters as of the ConfigScreen refactor.
+// Tests use names that mirror the project's prior defaults so the fixtures
+// stay readable.
+const FIELD_IDS = {
+  pageTitleFieldId: 'pageTitle',
+  pageStakeholderFieldId: 'stakeholderRefs',
+  stakeholderMemberFieldId: 'members',
+};
+
+const baseContext = (
+  cma: any,
+  triggers: Array<{ workflowDefinitionId: string; stepId: string }>,
+  paramOverrides: Record<string, any> = {}
+) =>
   ({
     spaceId: 'space-1',
     environmentId: 'env-1',
     cma,
-    appInstallationParameters: { triggers },
+    appInstallationParameters: {
+      triggers,
+      ...FIELD_IDS,
+      ...paramOverrides,
+    },
   } as any);
 
 describe('notifications handler', () => {
@@ -52,21 +69,35 @@ describe('notifications handler', () => {
     expect(cma.task.create).not.toHaveBeenCalled();
   });
 
-  it('fans out one task per unique stakeholder across linked brands', async () => {
+  it('bails when any required field id is missing from parameters', async () => {
+    const cma = makeCma();
+    await handler(
+      baseEvent(),
+      baseContext(
+        cma,
+        [{ workflowDefinitionId: 'wf-1', stepId: 'step-approved' }],
+        { pageTitleFieldId: '' }
+      )
+    );
+    expect(cma.entry.get).not.toHaveBeenCalled();
+    expect(cma.task.create).not.toHaveBeenCalled();
+  });
+
+  it('fans out one task per unique stakeholder across linked entries', async () => {
     const triggerEntry = {
       fields: {
-        adminTitle: { 'en-US': 'Summer Campaign' },
-        brands: {
+        pageTitle: { 'en-US': 'Summer Campaign' },
+        stakeholderRefs: {
           'en-US': [
-            { sys: { id: 'brand-a' } },
-            { sys: { id: 'brand-b' } },
+            { sys: { id: 'ref-a' } },
+            { sys: { id: 'ref-b' } },
           ],
         },
       },
     };
-    const brandA = {
+    const refA = {
       fields: {
-        stakeholders: {
+        members: {
           'en-US': [
             { userId: 'user-1', firstName: 'Ada', lastName: 'Lovelace' },
             { userId: 'user-2', firstName: 'Alan', lastName: 'Turing' },
@@ -74,11 +105,11 @@ describe('notifications handler', () => {
         },
       },
     };
-    const brandB = {
+    const refB = {
       fields: {
-        stakeholders: {
+        members: {
           'en-US': [
-            // user-1 appears on both brands; should only get one task.
+            // user-1 appears on both refs; should only get one task.
             { userId: 'user-1', firstName: 'Ada', lastName: 'Lovelace' },
             { userId: 'user-3', firstName: 'Grace', lastName: 'Hopper' },
           ],
@@ -92,8 +123,8 @@ describe('notifications handler', () => {
           .fn()
           .mockImplementation(({ entryId }) => {
             if (entryId === 'entry-1') return Promise.resolve(triggerEntry);
-            if (entryId === 'brand-a') return Promise.resolve(brandA);
-            if (entryId === 'brand-b') return Promise.resolve(brandB);
+            if (entryId === 'ref-a') return Promise.resolve(refA);
+            if (entryId === 'ref-b') return Promise.resolve(refB);
             throw new Error(`unexpected entry id ${entryId}`);
           }),
       },
@@ -121,13 +152,13 @@ describe('notifications handler', () => {
     );
   });
 
-  it('no-ops when the entry has no linked brands', async () => {
+  it('no-ops when the entry has no linked stakeholder references', async () => {
     const cma = makeCma({
       entry: {
         get: vi.fn().mockResolvedValue({
           fields: {
-            adminTitle: { 'en-US': 'No Brand' },
-            brand: { 'en-US': [] },
+            pageTitle: { 'en-US': 'No References' },
+            stakeholderRefs: { 'en-US': [] },
           },
         }),
       },

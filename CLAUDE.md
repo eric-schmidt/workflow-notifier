@@ -22,7 +22,7 @@ No lint script configured. ESLint inherits `react-app` preset via `package.json`
 
 ## Gotchas
 
-- **Hardcoded field IDs in `functions/notifications.ts`**: `BRAND_FIELD_ID='brands'`, `STAKEHOLDERS_FIELD_ID='stakeholders'`, `ADMIN_TITLE_FIELD_ID='adminTitle'`. These are not driven by the ConfigScreen — they must match the actual content model. Changing them in code without a matching model change will silently break the function.
+- **Field IDs are installation parameters, not constants**: The notifications function reads `pageTitleFieldId`, `pageStakeholderFieldId`, and `stakeholderMemberFieldId` from `context.appInstallationParameters`. They're curated on the ConfigScreen and required to save. The function aborts with a warn log if any are missing — there's no fallback. The constants that used to live at the top of `functions/notifications.ts` (`BRAND_FIELD_ID`, etc.) were removed.
 - **Manual event wiring after upload**: After `npm run upload`, the `notifications` function must be wired to the `Workflow.save` topic in the Contentful web UI (App Definition → Events). Not automated.
 - **Opaque CMA errors inside Functions**: Errors thrown by the CMA client inside a Contentful Function surface as `{ remote: true }` with the original message lost. To debug, reproduce the failing call against a plain CMA client outside the Function runtime.
 
