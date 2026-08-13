@@ -4,7 +4,7 @@
 
 ### Local
 1. Clone down this repo.
-2. Ensure you are using a minimum of Node v22 (if using [NVM](https://github.com/nvm-sh/nvm) you can just run `nvm use` in the repo root).
+2. Ensure you are using the correct version of Node. If using [NVM](https://github.com/nvm-sh/nvm), you can just run `nvm use` in the repo root.
 3. Run `npm install` to install dependencies.
 4. Run `npm run build` to create the build directory that can be uploaded to Contentful.
 5. You can run the *frontend* portion of this app locally using `npm run start`; however, the backend Functions have to be uploaded to Contentful in order to work properly (see next section).
