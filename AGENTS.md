@@ -25,8 +25,3 @@ No lint script configured. ESLint inherits `react-app` preset via `package.json`
 - **Field IDs are installation parameters, not constants**: The notifications function reads `pageTitleFieldId`, `pageStakeholderFieldId`, and `stakeholderMemberFieldId` from `context.appInstallationParameters`. They're curated on the ConfigScreen and required to save. The function aborts with a warn log if any are missing — there's no fallback. The constants that used to live at the top of `functions/notifications.ts` (`BRAND_FIELD_ID`, etc.) were removed.
 - **Manual event wiring after upload**: After `npm run upload`, the `notifications` function must be wired to the `Workflow.save` topic in the Contentful web UI (App Definition → Events). Not automated.
 - **Opaque CMA errors inside Functions**: Errors thrown by the CMA client inside a Contentful Function surface as `{ remote: true }` with the original message lost. To debug, reproduce the failing call against a plain CMA client outside the Function runtime.
-
-## When researching Contentful / Forma 36 / App SDK
-
-- **Verify with Glean first** before changing SDK usage, Forma 36 component props, or App SDK APIs — internal docs and prior incidents land there. Don't guess from memory.
-- **Use Contentful MCP tools** (`get_content_type`, `get_entry`, `search_entries`) to confirm content-model field IDs and shapes rather than inferring from code.
