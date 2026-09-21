@@ -19,8 +19,12 @@ const renderComp = (selected: Item[] = [], onChange = vi.fn()) => {
       getLabel={(i) => i.name}
     />
   );
-  return { onChange };
+  // The `combobox` role sits on Autocomplete's wrapper; this is the text input.
+  return { onChange, input: screen.getByTestId('cf-autocomplete-input') };
 };
+
+const optionLabels = () =>
+  screen.queryAllByRole('option').map((o) => o.textContent);
 
 describe('PillSelector', () => {
   it('renders an Autocomplete', () => {
@@ -38,5 +42,40 @@ describe('PillSelector', () => {
     const closeButtons = screen.getAllByLabelText(/close/i);
     fireEvent.click(closeButtons[0]);
     expect(onChange).toHaveBeenCalledWith([items[1]]);
+  });
+
+  it('appends the chosen item to the selection', () => {
+    const { onChange, input } = renderComp();
+
+    fireEvent.focus(input);
+    fireEvent.click(screen.queryAllByRole('option')[0]);
+
+    expect(onChange).toHaveBeenCalledWith([items[0]]);
+  });
+
+  it('filters the options by the typed text', () => {
+    const { input } = renderComp();
+
+    fireEvent.focus(input);
+    expect(optionLabels()).toEqual(['Alpha', 'Beta']);
+
+    fireEvent.change(input, { target: { value: 'bet' } });
+    expect(optionLabels()).toEqual(['Beta']);
+  });
+
+  it('fires again when the same item is picked twice', () => {
+    // Guards the sentinel `selectedItem`: Downshift caches the last selection
+    // and skips onSelectItem on a re-pick, so without it the second click here
+    // is silently swallowed. The parent owns selection state, so a re-pick is
+    // reachable whenever the parent has not yet applied the first one.
+    const { onChange, input } = renderComp();
+
+    fireEvent.focus(input);
+    fireEvent.click(screen.queryAllByRole('option')[0]);
+    fireEvent.focus(input);
+    fireEvent.click(screen.queryAllByRole('option')[0]);
+
+    expect(onChange).toHaveBeenCalledTimes(2);
+    expect(onChange).toHaveBeenLastCalledWith([items[0]]);
   });
 });
