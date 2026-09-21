@@ -46,14 +46,19 @@ function PillSelector<T>({
 
   // The sentinel is fed to Autocomplete's selectedItem to defeat Downshift's
   // cache; it must never reach the caller's getLabel, or "undefined" leaks into
-  // the input value and breaks filtering.
+  // the input value and breaks filtering. Only Autocomplete's own renderers can
+  // ever be handed the sentinel, so only they need the guard.
   const safeLabel = (item: T) =>
     (item as unknown) === SENTINEL ? '' : getLabel(item);
 
+  // Uses getLabel, not safeLabel: `available` comes from the caller and never
+  // contains the sentinel. Calling safeLabel here would have made the dep array
+  // a lie — it lists getLabel while closing over safeLabel — so this memo went
+  // stale the moment a caller passed an inline getLabel.
   const filtered = useMemo(
     () =>
       available.filter((item) =>
-        safeLabel(item).toLowerCase().includes(filter.toLowerCase())
+        getLabel(item).toLowerCase().includes(filter.toLowerCase())
       ),
     [available, filter, getLabel]
   );
